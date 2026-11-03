@@ -90,4 +90,76 @@ The server listens on `http://localhost:8080`.
 |----------------|-------------------|------------------------------------------------|
 | `id`           | integer           | Generated                                      |
 | `company`      | string            | Required, max 150 characters                   |
-| `role`         | string
+| `role`         | string            | Required, max 150 characters                   |
+| `job_url`      | string            | Optional                                       |
+| `status`       | string            | Defaults to `Applied`, max 30 characters       |
+| `job_type`     | string            | Optional, max 30 characters                    |
+| `applied_at`   | string (RFC 3339) | Required, e.g. `2026-11-01T00:00:00Z`          |
+| `interview_at` | string (RFC 3339) | Optional, cannot be before `applied_at`        |
+| `notes`        | string            | Optional                                       |
+| `created_at`   | string (RFC 3339) | Generated                                      |
+
+### Filtering
+
+`GET /applications` accepts these query parameters:
+
+| Parameter    | Behavior                                  |
+|--------------|-------------------------------------------|
+| `company`    | Partial, case-insensitive match           |
+| `role`       | Partial, case-insensitive match           |
+| `status`     | Exact match, case-insensitive             |
+| `job_type`   | Exact match                               |
+| `start_date` | `YYYY-MM-DD`, applied on or after         |
+| `end_date`   | `YYYY-MM-DD`, applied on or before        |
+
+### Examples
+
+Create:
+
+```
+curl -X POST http://localhost:8080/applications \
+  -d '{"company":"Acme","role":"Backend Developer","applied_at":"2026-11-01T00:00:00Z"}'
+```
+
+List with filters:
+
+```
+curl "http://localhost:8080/applications?status=applied&company=acme"
+```
+
+Update:
+
+```
+curl -X PUT http://localhost:8080/applications/1 \
+  -d '{"company":"Acme","role":"Backend Developer","status":"Interview","applied_at":"2026-11-01T00:00:00Z","interview_at":"2026-11-10T10:00:00Z"}'
+```
+
+Delete:
+
+```
+curl -X DELETE http://localhost:8080/applications/1
+```
+
+### Response codes
+
+| Code | Meaning                                  |
+|------|------------------------------------------|
+| 200  | Success                                  |
+| 201  | Created                                  |
+| 204  | Deleted                                  |
+| 400  | Invalid JSON, invalid id, or validation error |
+| 404  | Application not found                    |
+| 500  | Internal server error                    |
+
+## Roadmap
+
+- [ ] Allowed values for `status` and `job_type`
+- [ ] Graceful shutdown
+- [ ] Request logging and recovery middleware
+- [ ] Unit and handler tests
+- [ ] Dockerfile and docker-compose
+- [ ] Authentication
+
+## License
+
+MIT

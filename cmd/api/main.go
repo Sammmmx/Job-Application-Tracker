@@ -1,113 +1,40 @@
 package main
 
 import (
-	"database/sql"
-	"encoding/json"
-	"errors"
-	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/Sammmmx/job-application-tracker/internal/application"
+	"github.com/Sammmmx/job-application-tracker/internal/database"
+
+	"github.com/joho/godotenv"
 )
 
-type Application struct {
-	ID          int       `json:"id"`
-	Company     string    `json:"company"`
-	Role        string    `json:"role"`
-	JobURL      string    `json:"job_url"`
-	Status      string    `json:"status"`
-	JobType     string    `json:"job_type"`
-	AppliedAt   time.Time `json:"applied_at"`
-	InterviewAt time.Time `json:"interview_at"`
-	Notes       string    `json:"notes"`
-	CreatedAt   time.Time `json:"create_at"`
-}
-
-type ApplicationInput struct {
-	Company     string    `json:"company"`
-	Role        string    `json:"role"`
-	JobURL      string    `json:"job_url"`
-	Status      string    `json:"status"`
-	JobType     string    `json:"job_type"`
-	AppliedAt   time.Time `json:"applied_at"`
-	InterviewAt time.Time `json:"interview_at"`
-	Notes       string    `json:"notes"`
-}
-
-// JSON response helper functions
-
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Printf("Failed to encode JSON response: %v", err)
-	}
-}
-
-func decodeJSON(r *http.Request, dst any) error {
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(dst); err != nil {
-		return err
-	}
-
-	// Ensure the body contains only one JSON value.
-	var extra any
-	if err := decoder.Decode(&extra); err != io.EOF {
-		if err == nil {
-			return errors.New("request body must contain only one JSON value")
-		}
-		return err
-	}
-
-	return nil
-}
-
-func getUsersHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		applications, err := getApplications(db)
-		if err != nil {
-			log.Printf("Failed to retrieve applications: %v", err)
-			http.Error(w, "Could not retrieve applications",
-				http.StatusInternalServerError)
-			return
-		}
-
-		writeJSON(w, http.StatusOK, applications)
-	}
-}
-
-// Database connection and initialization
-
 func main() {
-	// Load environment variables from .env file if it exists
-	u := &url.URL{
-		Scheme: "postgres",
-		User:   url.UserPassword("postgres", os.Getenv("PASSWORD")),
-		Host:   "localhost:5432",
-		Path:   "postgres",
-	}
-	q := u.Query()
-	q.Set("sslmode", "disable")
-	u.RawQuery = q.Encode()
+	_ = godotenv.Load()
 
-	db, err := sql.Open("postgres", u.String())
+	db, err := database.Connect(os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	defer db.Close()
 
-	if err := db.Ping(); err != nil {
-		log.Fatal(err)
+	h := application.NewHandler(application.NewService(application.NewRepository(db)))
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	server := &http.Server{
+		Addr:              ":8080",
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
-	log.Println("Connected to PostgreSQL")
-
+	log.Println("Server listening on :8080")
+	log.Fatal(server.ListenAndServe())
 }

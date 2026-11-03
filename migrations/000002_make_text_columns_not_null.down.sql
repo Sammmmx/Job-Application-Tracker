@@ -1,0 +1,7 @@
+ALTER TABLE job_applications
+    ALTER COLUMN job_url  DROP NOT NULL,
+    ALTER COLUMN job_url  DROP DEFAULT,
+    ALTER COLUMN job_type DROP NOT NULL,
+    ALTER COLUMN job_type DROP DEFAULT,
+    ALTER COLUMN notes    DROP NOT NULL,
+    ALTER COLUMN notes    DROP DEFAULT;

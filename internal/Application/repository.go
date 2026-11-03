@@ -3,224 +3,107 @@ package application
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
-	"time"
 )
 
-type Repository struct {
-	DB *sql.DB
+type Repository struct{ DB *sql.DB }
+
+func NewRepository(db *sql.DB) *Repository { return &Repository{DB: db} }
+
+const applicationColumns = `id, company, role, job_url, status,
+	job_type, applied_at, interview_at, notes, created_at`
+
+type scanner interface{ Scan(dest ...any) error }
+
+func scanApplication(s scanner) (Application, error) {
+	var a Application
+	err := s.Scan(&a.ID, &a.Company, &a.Role, &a.JobURL, &a.Status,
+		&a.JobType, &a.AppliedAt, &a.InterviewAt, &a.Notes, &a.CreatedAt)
+	return a, err
 }
 
-func NewRepository(db *sql.DB) *Repository {
-	return &Repository{
-		DB: db,
-	}
-}
-
-const applicationColumns = `
-    id, company, role, job_url, status,
-    job_type, applied_at, interview_at,
-    notes, created_at`
-
-func (r *Repository) GetApplications(ctx context.Context) ([]Application, error) {
-	rows, err := r.DB.QueryContext(ctx,
-		`SELECT ${applicationColumns} FROM job_applications`,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	defer rows.Close()
-
-	var applications []Application
-
-	for rows.Next() {
-		var application Application
-		if err := rows.Scan(
-			&application.ID,
-			&application.Company,
-			&application.Role,
-			&application.JobURL,
-			&application.Status,
-			&application.JobType,
-			&application.AppliedAt,
-			&application.InterviewAt,
-			&application.Notes,
-			&application.CreatedAt); err != nil {
-			return nil, err
-		}
-		applications = append(applications, application)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return applications, nil
-}
-
-func (r *Repository) CreateApplication(ctx context.Context, company, role, jobURL, status, jobType string, appliedAt, interviewAt time.Time, notes string) (Application, error) {
-	var application Application
-	err := r.DB.QueryRowContext(ctx,
-		`INSERT INTO job_applications (company, role, job_url, status, job_type, applied_at, interview_at, notes)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		 RETURNING id, company, role, job_url, status, job_type, applied_at, interview_at, notes, created_at`,
-		company, role, jobURL, status, jobType, appliedAt, interviewAt, notes,
-	).Scan(
-		&application.ID,
-		&application.Company,
-		&application.Role,
-		&application.JobURL,
-		&application.Status,
-		&application.JobType,
-		&application.AppliedAt,
-		&application.InterviewAt,
-		&application.Notes,
-		&application.CreatedAt,
-	)
-	if err != nil {
-		return Application{}, err
-	}
-
-	return application, nil
-}
-
-func (r *Repository) UpdateApplication(ctx context.Context, id int, company, role, jobURL, status, jobType string, appliedAt, interviewAt time.Time, notes string) (Application, error) {
-	var application Application
-	err := r.DB.QueryRowContext(ctx,
-		`UPDATE job_applications
-		 SET company = $1, role = $2, job_url = $3, status = $4, job_type = $5, applied_at = $6, interview_at = $7, notes = $8
-		 WHERE id = $9
-		 RETURNING id, company, role, job_url, status, job_type, applied_at, interview_at, notes, created_at`,
-		company, role, jobURL, status, jobType, appliedAt, interviewAt, notes, id,
-	).Scan(
-		&application.ID,
-		&application.Company,
-		&application.Role,
-		&application.JobURL,
-		&application.Status,
-		&application.JobType,
-		&application.AppliedAt,
-		&application.InterviewAt,
-		&application.Notes,
-		&application.CreatedAt,
-	)
-	if err != nil {
-		return Application{}, err
-	}
-	return application, nil
-}
-
-func (r *Repository) DeleteApplication(ctx context.Context, id int) error {
-	result, err := r.DB.ExecContext(ctx,
-		`DELETE FROM job_applications WHERE id = $1`,
-		id,
-	)
-	if err != nil {
-		return err
-	}
-	count, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if count == 0 {
-		return sql.ErrNoRows
-	}
-
-	return nil
-}
-
-// Filter applications
-
-func (r *Repository) FilterApplications(ctx context.Context, filter ApplicationFilter) ([]Application, error) {
-	query := `SELECT ${applicationColumns} FROM job_applications WHERE 1=1`
+func (r *Repository) List(ctx context.Context, f ApplicationFilter) ([]Application, error) {
+	query := "SELECT " + applicationColumns + " FROM job_applications WHERE 1=1"
 	args := []any{}
-	argIndex := 1
 
-	if filter.ID != 0 {
-		query += fmt.Sprintf(" AND id = $%d", argIndex)
-		args = append(args, filter.ID)
-		argIndex++
+	add := func(cond string, v any) {
+		args = append(args, v)
+		query += fmt.Sprintf(" AND "+cond, len(args))
 	}
-
-	if filter.Company != "" {
-		query += fmt.Sprintf(" AND company = $%d", argIndex)
-		args = append(args, filter.Company)
-		argIndex++
+	if f.Company != "" {
+		add("company ILIKE $%d", "%"+f.Company+"%")
 	}
-
-	if filter.Role != "" {
-		query += fmt.Sprintf(" AND role = $%d", argIndex)
-		args = append(args, filter.Role)
-		argIndex++
+	if f.Role != "" {
+		add("role ILIKE $%d", "%"+f.Role+"%")
 	}
-
-	if filter.JobURL != "" {
-		query += fmt.Sprintf(" AND job_url = $%d", argIndex)
-		args = append(args, filter.JobURL)
-		argIndex++
+	if f.Status != "" {
+		add("lower(status) = lower($%d)", f.Status)
 	}
-
-	if filter.Status != "" {
-		query += fmt.Sprintf(" AND status = $%d", argIndex)
-		args = append(args, filter.Status)
-		argIndex++
+	if f.JobType != "" {
+		add("lower(job_type) = lower($%d)", f.JobType)
 	}
-
-	if filter.JobType != "" {
-		query += fmt.Sprintf(" AND job_type = $%d", argIndex)
-		args = append(args, filter.JobType)
-		argIndex++
+	if !f.StartDate.IsZero() {
+		add("applied_at >= $%d", f.StartDate)
 	}
-
-	if !filter.StartDate.IsZero() && !filter.EndDate.IsZero() {
-		args = append(args, filter.StartDate, filter.EndDate)
-
-		query += fmt.Sprintf(
-			" AND applied_at BETWEEN $%d AND $%d",
-			len(args)-1,
-			len(args),
-		)
+	if !f.EndDate.IsZero() {
+		add("applied_at <= $%d", f.EndDate)
 	}
-
-	if !filter.StartDate.IsZero() &&
-		filter.StartDate.After(filter.EndDate) {
-		return nil, errors.New("start_date cannot be after end_date")
-	}
+	query += " ORDER BY applied_at DESC, id DESC"
 
 	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
-
 	defer rows.Close()
 
-	var applications []Application
-
+	apps := []Application{} // empty slice -> JSON [] instead of null
 	for rows.Next() {
-		var application Application
-		if err := rows.Scan(
-			&application.ID,
-			&application.Company,
-			&application.Role,
-			&application.JobURL,
-			&application.Status,
-			&application.JobType,
-			&application.AppliedAt,
-			&application.InterviewAt,
-			&application.Notes,
-			&application.CreatedAt,
-		); err != nil {
+		a, err := scanApplication(rows)
+		if err != nil {
 			return nil, err
 		}
-		applications = append(applications, application)
+		apps = append(apps, a)
 	}
+	return apps, rows.Err()
+}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+func (r *Repository) Get(ctx context.Context, id int) (Application, error) {
+	return scanApplication(r.DB.QueryRowContext(ctx,
+		"SELECT "+applicationColumns+" FROM job_applications WHERE id = $1", id))
+}
+
+func (r *Repository) Create(ctx context.Context, in ApplicationInput) (Application, error) {
+	return scanApplication(r.DB.QueryRowContext(ctx,
+		`INSERT INTO job_applications
+		   (company, role, job_url, status, job_type, applied_at, interview_at, notes)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		 RETURNING `+applicationColumns,
+		in.Company, in.Role, in.JobURL, in.Status, in.JobType,
+		in.AppliedAt, in.InterviewAt, in.Notes))
+}
+
+func (r *Repository) Update(ctx context.Context, id int, in ApplicationInput) (Application, error) {
+	return scanApplication(r.DB.QueryRowContext(ctx,
+		`UPDATE job_applications
+		 SET company=$1, role=$2, job_url=$3, status=$4, job_type=$5,
+		     applied_at=$6, interview_at=$7, notes=$8
+		 WHERE id=$9
+		 RETURNING `+applicationColumns,
+		in.Company, in.Role, in.JobURL, in.Status, in.JobType,
+		in.AppliedAt, in.InterviewAt, in.Notes, id))
+}
+
+func (r *Repository) Delete(ctx context.Context, id int) error {
+	res, err := r.DB.ExecContext(ctx, `DELETE FROM job_applications WHERE id = $1`, id)
+	if err != nil {
+		return err
 	}
-
-	return applications, nil
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }

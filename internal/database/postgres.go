@@ -37,3 +37,23 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 		log.Printf("Failed to encode JSON response: %v", err)
 	}
 }
+
+func decodeJSON(r *http.Request, dst any) error {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+
+	// Ensure the body contains only one JSON value.
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errors.New("request body must contain only one JSON value")
+		}
+		return err
+	}
+
+	return nil
+}

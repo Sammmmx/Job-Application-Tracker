@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 )
 
 var (
@@ -12,14 +13,28 @@ var (
 	ErrInvalid  = errors.New("invalid application")
 )
 
-type Service struct{ repo *Repository }
+type Store interface {
+	List(ctx context.Context, f ApplicationFilter) ([]Application, error)
+	Get(ctx context.Context, id int) (Application, error)
+	Create(ctx context.Context, in ApplicationInput) (Application, error)
+	Update(ctx context.Context, id int, in ApplicationInput) (Application, error)
+	Delete(ctx context.Context, id int) error
+}
 
-func NewService(r *Repository) *Service { return &Service{repo: r} }
+var _ Store = (*Repository)(nil) // compile-time check that Repository satisfies Store
+
+type Service struct{ repo Store }
+
+func NewService(r Store) *Service { return &Service{repo: r} }
 
 // normalize fills in defaults before validation and saving.
 func normalize(in *ApplicationInput) {
 	if in.Status == "" {
 		in.Status = "Applied"
+	}
+
+	if in.AppliedAt.IsZero() {
+		in.AppliedAt = time.Now()
 	}
 }
 

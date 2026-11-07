@@ -1,7 +1,5 @@
 # Job Application Tracker
 
-A backend REST API, written in Go, for keeping track of the jobs you apply to. Create applications, update their status as you move through the hiring process, and keep everything stored in PostgreSQL.
-
 > Built as a learning project to practice backend fundamentals: layered architecture, database migrations, testing, and CI.
 
 ## Features

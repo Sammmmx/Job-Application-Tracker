@@ -64,7 +64,7 @@ Keeping these separate makes each layer easy to test on its own. The service tes
 
 ### Prerequisites
 
-- [Go](https://go.dev/dl/) 1.21 or newer (check the version in `go.mod`)
+- [Go](https://go.dev/dl/) 1.22 or newer (check the version in `go.mod`)
 - [PostgreSQL](https://www.postgresql.org/download/)
 - A migration tool such as [golang-migrate](https://github.com/golang-migrate/migrate)
 

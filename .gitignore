@@ -1,2 +1,6 @@
 node_modules/
 .env
+api.exe
+cover
+cover.out
+*.exe

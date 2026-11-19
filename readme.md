@@ -4,7 +4,7 @@
 
 I kept losing track of where I'd applied, so I built an API to keep track for me. You save applications, filter them by company, status or date, and update them as things move along (applied, interview, offer).
 
-It's written in Go with PostgreSQL. It's also my first real backend project, so I built it the way a production service would be built: separate layers, migrations, three kinds of tests, CI, and Docker.
+It's written in Go with PostgreSQL. It's also my first real backend project, so I built it the way a production service would be built having separate layers, migrations, three kinds of tests, CI, and Docker.
 
 ## What it does
 
@@ -20,7 +20,7 @@ Go (standard library router, so Go 1.22 or newer), PostgreSQL 16, golang-migrate
 
 ## How the code is organised
 
-A request goes through three layers, and each one only talks to the next:
+A request goes through three layers, and each one only talks to the next -
 
 ```
 middleware -> handler -> service -> repository -> PostgreSQL

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 type Repository struct{ DB *sql.DB }
@@ -22,19 +23,21 @@ func scanApplication(s scanner) (Application, error) {
 	return a, err
 }
 
-func (r *Repository) List(ctx context.Context, f ApplicationFilter) ([]Application, error) {
-	query := "SELECT " + applicationColumns + " FROM job_applications WHERE 1=1"
+// buildWhere turns the filter into a WHERE clause plus its $1, $2... arguments.
+// Only placeholders are ever put into the SQL text, never the user's values.
+func buildWhere(f ApplicationFilter) (string, []any) {
+	where := " WHERE 1=1"
 	args := []any{}
 
 	add := func(cond string, v any) {
 		args = append(args, v)
-		query += fmt.Sprintf(" AND "+cond, len(args))
+		where += fmt.Sprintf(" AND "+cond, len(args))
 	}
 	if f.Company != "" {
-		add("company ILIKE $%d", "%"+f.Company+"%")
+		add("company ILIKE $%d", "%"+escapeLike(f.Company)+"%")
 	}
 	if f.Role != "" {
-		add("role ILIKE $%d", "%"+f.Role+"%")
+		add("role ILIKE $%d", "%"+escapeLike(f.Role)+"%")
 	}
 	if f.Status != "" {
 		add("lower(status) = lower($%d)", f.Status)
@@ -48,11 +51,33 @@ func (r *Repository) List(ctx context.Context, f ApplicationFilter) ([]Applicati
 	if !f.EndDate.IsZero() {
 		add("applied_at <= $%d", f.EndDate)
 	}
-	query += " ORDER BY applied_at DESC, id DESC"
+	return where, args
+}
+
+// escapeLike makes %, _ and \ in the user's text match literally. Without this,
+// searching for "100%" or "a_b" would treat the characters as wildcards.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
+}
+
+// List returns one page of matching rows, plus the total number of matches.
+func (r *Repository) List(ctx context.Context, f ApplicationFilter, p Page) ([]Application, int, error) {
+	where, args := buildWhere(f)
+
+	var total int
+	if err := r.DB.QueryRowContext(ctx,
+		"SELECT count(*) FROM job_applications"+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query := "SELECT " + applicationColumns + " FROM job_applications" + where +
+		" ORDER BY applied_at DESC, id DESC" +
+		fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
+	args = append(args, p.Limit, p.Offset)
 
 	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -60,11 +85,11 @@ func (r *Repository) List(ctx context.Context, f ApplicationFilter) ([]Applicati
 	for rows.Next() {
 		a, err := scanApplication(rows)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		apps = append(apps, a)
 	}
-	return apps, rows.Err()
+	return apps, total, rows.Err()
 }
 
 func (r *Repository) Get(ctx context.Context, id int) (Application, error) {

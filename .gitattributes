@@ -1,0 +1,5 @@
+# Keep line endings identical on Windows, Linux and CI so gofmt checks don't fail.
+*.go   text eol=lf
+*.sql  text eol=lf
+*.yml  text eol=lf
+Dockerfile text eol=lf

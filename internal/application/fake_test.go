@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"database/sql"
+	"sort"
 )
 
 // fakeStore is an in-memory Store for tests.
@@ -16,12 +17,22 @@ func newFakeStore() *fakeStore {
 	return &fakeStore{data: map[int]Application{}, nextID: 1}
 }
 
-func (f *fakeStore) List(ctx context.Context, filter ApplicationFilter) ([]Application, error) {
-	out := []Application{}
+func (f *fakeStore) List(ctx context.Context, filter ApplicationFilter, p Page) ([]Application, int, error) {
+	all := make([]Application, 0, len(f.data))
 	for _, a := range f.data {
-		out = append(out, a)
+		all = append(all, a)
 	}
-	return out, nil
+	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID }) // map order is random
+	total := len(all)
+
+	if p.Offset >= total {
+		return []Application{}, total, nil
+	}
+	end := p.Offset + p.Limit
+	if end > total {
+		end = total
+	}
+	return all[p.Offset:end], total, nil
 }
 
 func (f *fakeStore) Get(ctx context.Context, id int) (Application, error) {

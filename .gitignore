@@ -1,6 +1,11 @@
-node_modules/
+# secrets and local config
 .env
-api.exe
+
+# build output and test artifacts
+*.exe
 cover
 cover.out
-*.exe
+*.out
+
+# not part of this Go project
+node_modules/

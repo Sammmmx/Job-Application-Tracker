@@ -215,9 +215,9 @@ There are three kinds:
 
 The repository tests wipe the table, so they use their own database and only run when `TEST_DATABASE_URL` is set. Otherwise they are skipped. Apply the migrations to that database first:
 
-```bash
-migrate -path migrations -database "$TEST_DATABASE_URL" up
-export TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5433/jobtracker_test?sslmode=disable"
+```powershell
+$env:TEST_DATABASE_URL = "postgres://postgres:postgres@localhost:5433/jobtracker_test?sslmode=disable"
+migrate -path migrations -database $env:TEST_DATABASE_URL up
 go test ./... -cover
 ```
 

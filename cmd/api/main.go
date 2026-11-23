@@ -14,6 +14,7 @@ import (
 	"github.com/Sammmmx/job-application-tracker/internal/config"
 	"github.com/Sammmmx/job-application-tracker/internal/database"
 	"github.com/Sammmmx/job-application-tracker/internal/middleware"
+	"github.com/Sammmmx/job-application-tracker/internal/web"
 
 	"github.com/joho/godotenv"
 )
@@ -43,6 +44,9 @@ func run() error {
 
 	mux := http.NewServeMux()
 	application.NewHandler(application.NewService(application.NewRepository(db))).RegisterRoutes(mux)
+	if err := web.RegisterRoutes(mux); err != nil {
+		return fmt.Errorf("register web routes: %w", err)
+	}
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()

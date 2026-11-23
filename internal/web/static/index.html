@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Application Tracker</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">JT</div>
+        <div>
+          <h1>Job Application Tracker</h1>
+          <p class="subtitle">Track applications, interviews, and offers</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span id="healthBadge" class="health-badge checking">Checking API...</span>
+        <button id="addBtn" class="btn btn-primary">+ Add Application</button>
+      </div>
+    </header>
+
+    <section class="stats-grid" id="statsGrid">
+      <div class="stat-card">
+        <span class="stat-label">Matching Total</span>
+        <span class="stat-value" id="statTotal">0</span>
+      </div>
+      <div class="stat-card stat-applied">
+        <span class="stat-label">Applied (Page)</span>
+        <span class="stat-value" id="statApplied">0</span>
+      </div>
+      <div class="stat-card stat-interview">
+        <span class="stat-label">Interview (Page)</span>
+        <span class="stat-value" id="statInterview">0</span>
+      </div>
+      <div class="stat-card stat-offer">
+        <span class="stat-label">Offer (Page)</span>
+        <span class="stat-value" id="statOffer">0</span>
+      </div>
+    </section>
+
+    <section class="card filters-card">
+      <form id="filterForm" class="filters-grid">
+        <div class="field">
+          <label for="filterCompany">Company</label>
+          <input id="filterCompany" type="text" placeholder="e.g. Acme" />
+        </div>
+        <div class="field">
+          <label for="filterRole">Role</label>
+          <input id="filterRole" type="text" placeholder="e.g. Backend" />
+        </div>
+        <div class="field">
+          <label for="filterStatus">Status</label>
+          <select id="filterStatus">
+            <option value="">All statuses</option>
+            <option value="Applied">Applied</option>
+            <option value="Interview">Interview</option>
+            <option value="Offer">Offer</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Withdrawn">Withdrawn</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="filterJobType">Job Type</label>
+          <select id="filterJobType">
+            <option value="">All types</option>
+            <option value="Full-time">Full-time</option>
+            <option value="Part-time">Part-time</option>
+            <option value="Internship">Internship</option>
+            <option value="Contract">Contract</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="filterStartDate">Applied From</label>
+          <input id="filterStartDate" type="date" />
+        </div>
+        <div class="field">
+          <label for="filterEndDate">Applied To</label>
+          <input id="filterEndDate" type="date" />
+        </div>
+        <div class="filter-actions">
+          <button type="submit" class="btn btn-secondary">Apply</button>
+          <button type="button" id="clearFiltersBtn" class="btn btn-ghost">Clear</button>
+        </div>
+      </form>
+    </section>
+
+    <div id="banner" class="banner hidden" role="alert"></div>
+
+    <section class="card table-card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Role</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Applied</th>
+              <th>Interview</th>
+              <th>Notes</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="applicationsBody">
+            <tr>
+              <td colspan="8" class="empty-cell">Loading applications...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <footer class="pagination-bar">
+        <div class="pagination-info" id="paginationInfo">Showing 0 of 0</div>
+        <div class="pagination-controls">
+          <label class="limit-label">
+            Per page
+            <select id="limitSelect">
+              <option value="10">10</option>
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+            </select>
+          </label>
+          <button id="prevPageBtn" class="btn btn-ghost" disabled>Previous</button>
+          <button id="nextPageBtn" class="btn btn-ghost" disabled>Next</button>
+        </div>
+      </footer>
+    </section>
+  </div>
+
+  <!-- Create / Edit Modal -->
+  <div id="appModal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h2 id="modalTitle">Add Application</h2>
+        <button id="closeModalBtn" class="icon-btn" aria-label="Close">&times;</button>
+      </div>
+      <form id="appForm" class="modal-body">
+        <div id="formError" class="form-error hidden"></div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="companyInput">Company *</label>
+            <input id="companyInput" type="text" maxlength="150" required placeholder="Acme Corp" />
+          </div>
+          <div class="field">
+            <label for="roleInput">Role *</label>
+            <input id="roleInput" type="text" maxlength="150" required placeholder="Backend Developer" />
+          </div>
+          <div class="field">
+            <label for="statusInput">Status</label>
+            <select id="statusInput">
+              <option value="Applied">Applied</option>
+              <option value="Interview">Interview</option>
+              <option value="Offer">Offer</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Withdrawn">Withdrawn</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="jobTypeInput">Job Type</label>
+            <select id="jobTypeInput">
+              <option value="">Unspecified</option>
+              <option value="Full-time">Full-time</option>
+              <option value="Part-time">Part-time</option>
+              <option value="Internship">Internship</option>
+              <option value="Contract">Contract</option>
+            </select>
+          </div>
+          <div class="field full-span">
+            <label for="jobUrlInput">Job URL</label>
+            <input id="jobUrlInput" type="url" placeholder="https://acme.example/jobs/123" />
+          </div>
+          <div class="field">
+            <label for="appliedAtInput">Applied Date &amp; Time</label>
+            <input id="appliedAtInput" type="datetime-local" />
+            <span class="hint">Defaults to now if left blank on create</span>
+          </div>
+          <div class="field">
+            <label for="interviewAtInput">Interview Date &amp; Time</label>
+            <input id="interviewAtInput" type="datetime-local" />
+            <span class="hint">Leave blank to leave unset or clear</span>
+          </div>
+          <div class="field full-span">
+            <label for="notesInput">Notes</label>
+            <textarea id="notesInput" rows="3" placeholder="Referral, recruiter contact, interview prep..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="cancelModalBtn" class="btn btn-ghost">Cancel</button>
+          <button type="submit" id="saveBtn" class="btn btn-primary">Save Application</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteModal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+      <div class="modal-header">
+        <h2 id="deleteTitle">Delete Application</h2>
+        <button id="closeDeleteBtn" class="icon-btn" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="deletePrompt">Are you sure you want to delete this application?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="cancelDeleteBtn" class="btn btn-ghost">Cancel</button>
+        <button type="button" id="confirmDeleteBtn" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
